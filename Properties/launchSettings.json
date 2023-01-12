@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "EdjCase.Cryptography.BLS": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
