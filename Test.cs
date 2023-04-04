@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using static EdjCase.Cryptography.BLS.Interop2;
+using static EdjCase.Cryptography.BLS.Interop;
 
 namespace EdjCase.Cryptography.BLS
 {
@@ -27,16 +27,7 @@ namespace EdjCase.Cryptography.BLS
 			};
 			try
 			{
-				bool isValid1 = BlsUtil.VerifyHash(publicKey, message, signature);
-				Console.WriteLine("1: " + isValid1);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("1: " + ex);
-			}
-			try
-			{
-				bool isValid2 = BlsUtil2.VerifyHash(publicKey, message, signature);
+				bool isValid2 = BlsUtil.VerifyHash(publicKey, message, signature);
 				Console.WriteLine("2: " + isValid2);
 
 			}

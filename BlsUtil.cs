@@ -1,15 +1,11 @@
 using System;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
+using System.Collections.Generic;
+using System.Text;
 
 namespace EdjCase.Cryptography.BLS
 {
-	// Modified from https://github.com/NethermindEth/cortex-cryptography-bls/blob/641f25297465e494dfcf62cd31ec44d6dc86a927/src/Cortex.Cryptography.Bls/BLSHerumi.cs
-	public static class BlsUtil
+	internal class BlsUtil
 	{
-		private const int DomainLength = 8;
-		private const int HashLength = 32;
-		private const int PrivateKeyLength = 32;
 		private const int PublicKeyLength = 96;
 		private const int SignatureLength = 48;
 
@@ -22,16 +18,17 @@ namespace EdjCase.Cryptography.BLS
 			{
 				if (!BlsUtil.isInitialized)
 				{
-					int result = Interop.Init(Interop.MCL_BLS12_381, Interop.MCLBN_COMPILED_TIME_VAR);
-					if (result != 0)
-					{
-						throw new InvalidOperationException("Dll failed to initialize. Error Code: " + result);
-					}
+					Interop.Init(Interop.MCL_BLS12_381);
+					Interop.SetETHserialization(true);
+					Interop.SetMapToMode(Interop.MapToMode.HashToCurve);
+					Interop.PublicKey gen = new Interop.PublicKey();
+					gen.SetStr("1 0x24aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8 0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e 0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801 0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be");
+					Interop.SetGeneratorOfPublicKey(ref gen);
+					Interop.SetDstG1("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_");
 					BlsUtil.isInitialized = true;
 				}
 			}
 		}
-
 		public static bool VerifyHash(
 			byte[] publicKey,
 			byte[] hash,
@@ -42,46 +39,28 @@ namespace EdjCase.Cryptography.BLS
 			{
 				throw new ArgumentOutOfRangeException(nameof(signature), signature.Length, $"Signature must be {SignatureLength} bytes long.");
 			}
+			if (publicKey.Length != PublicKeyLength)
+			{
+				throw new ArgumentOutOfRangeException(nameof(publicKey), signature.Length, $"Public Key must be {PublicKeyLength} bytes long.");
+			}
 			EnsureInitialized();
 
-			var blsPublicKey = default(Interop.BlsPublicKey);
-			int publicKeyBytesRead;
-			unsafe
-			{
-				fixed (byte* publicKeyPtr = publicKey)
-				{
-					publicKeyBytesRead = Interop.PublicKeyDeserialize(ref blsPublicKey, publicKeyPtr, publicKey!.Length);
-				}
-			}
-			//int publicKeyBytesRead = Interop.PublicKeyDeserialize(ref blsPublicKey, publicKey, (ulong)publicKey!.Length);
-			if (publicKeyBytesRead != publicKey.Length)
+			var blsPublicKey = default(Interop.PublicKey);
+			ulong publicKeyBytesRead = Interop.blsPublicKeyDeserialize(ref blsPublicKey, publicKey, (ulong)publicKey!.LongLength);
+
+			if (publicKeyBytesRead != (ulong)publicKey.Length)
 			{
 				throw new Exception($"Error deserializing BLS public key");
 			}
 
-			var blsSignature = default(Interop.BlsSignature);
-			int signatureBytesRead;
-			unsafe
-			{
-				fixed (byte* signaturePtr = signature)
-				{
-					signatureBytesRead = Interop.SignatureDeserialize(ref blsSignature, signaturePtr, SignatureLength);
-				}
-			}
-			if (signatureBytesRead != signature.Length)
+			var blsSignature = default(Interop.Signature);
+			ulong signatureBytesRead = Interop.blsSignatureDeserialize(ref blsSignature, signature, (ulong)signature.LongLength);
+			if (signatureBytesRead != (ulong)signature.LongLength)
 			{
 				throw new Exception($"Error deserializing BLS signature, length: {signatureBytesRead}");
 			}
 
-			int result;
-
-			unsafe
-			{
-				fixed (byte* hashPtr = hash)
-				{
-					result = Interop.VerifyHash(ref blsSignature, ref blsPublicKey, hashPtr, hash.Length);
-				}
-			}
+			int result = Interop.blsVerify(in blsSignature, in blsPublicKey, hash, (ulong)hash.Length);
 
 			return result == 1;
 		}
